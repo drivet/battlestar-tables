@@ -9,16 +9,20 @@ import {
   Post,
   Put,
   Query,
-  Res,
+  Response,
   Route,
   Security,
   SuccessResponse,
   Tags,
-  TsoaResponse,
 } from 'tsoa';
 
 import { InviteUpdatePayload, Table, TableCreatePayload } from '../services/table-models';
 import { TableService } from './../services/table-service';
+
+interface ValidateErrorJSON {
+  message: 'Validation failed';
+  details: { [name: string]: unknown };
+}
 
 @Security('ApiKeyAuth')
 @Route('tables')
@@ -34,9 +38,11 @@ export class TableController extends Controller {
    *
    * @param requestBody the JSON body in the request
    */
+  @Response<ValidateErrorJSON>(422, 'Validation Failed')
   @SuccessResponse('201', 'Created')
   @Post()
   async createTable(@Body() requestBody: TableCreatePayload): Promise<Table> {
+    this.setStatus(201);
     return this.tableService.createTable(requestBody);
   }
 
@@ -45,15 +51,16 @@ export class TableController extends Controller {
    *
    * @param id the table id of the table you want to fetch
    */
+  @Response(404, 'Not Found')
   @SuccessResponse('200', 'Ok')
   @Get('{id}')
-  public async getTable(
-    @Path() id: string,
-    @Res() notFoundResponse: TsoaResponse<404, { reason: string }>
-  ): Promise<Table> {
+  public async getTable(@Path() id: string): Promise<Table> {
     const table = await this.tableService.getTable(id);
     if (!table || !table._id) {
-      notFoundResponse(404, { reason: 'table not found' });
+      throw {
+        message: 'table not found',
+        status: 404,
+      };
     }
     return table;
   }
@@ -96,6 +103,7 @@ export class TableController extends Controller {
    *
    * @param requestBody the JSON body in the request
    */
+  @Response<ValidateErrorJSON>(422, 'Validation Failed')
   @SuccessResponse('204', 'No content')
   @Patch('{id}/invitations/{invitee}')
   async updateInvite(
