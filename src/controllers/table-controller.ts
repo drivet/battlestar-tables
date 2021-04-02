@@ -90,7 +90,8 @@ export class TableController extends Controller {
   /**
    * Creates an invitation
    *
-   * @param requestBody the JSON body in the request
+   * @param id the table id of the table you want to invite people to
+   * @param invitee the person sending the invitations
    */
   @SuccessResponse('204', 'No content')
   @Put('{id}/invitations/{invitee}')
@@ -101,7 +102,9 @@ export class TableController extends Controller {
   /**
    * Updates an invitation
    *
-   * @param requestBody the JSON body in the request
+   * @param id the table id of the table you want to invite people to
+   * @param invitee the person sending the invitations
+   * @param requestBody information to update the invite
    */
   @Response<ValidateErrorJSON>(422, 'Validation Failed')
   @SuccessResponse('204', 'No content')
