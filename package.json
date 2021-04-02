@@ -6,7 +6,7 @@
   "scripts": {
     "build": "tsoa spec-and-routes && tsc",
     "lint": "eslint ./src",
-    "lint:fix": "esline --fix ./src",
+    "lint:fix": "eslint --fix ./src",
     "bstart": "npm run build && node dist/server.js",
     "start": "node dist/server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
