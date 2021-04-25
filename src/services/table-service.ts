@@ -39,7 +39,7 @@ export class TableService {
       throw new Error('Cannot define both inviter and invitee');
     }
     if (inviter) {
-      return await this.getCollection().find({ inviter: inviter }).toArray();
+      return await this.getCollection().find({ inviter }).toArray();
     } else if (invitee) {
       return await this.getCollection().find({ 'invitations.invitee': invitee }).toArray();
     } else {

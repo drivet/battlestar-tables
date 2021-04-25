@@ -1,7 +1,8 @@
-import bodyParser from 'body-parser';
-import express, { NextFunction, Request as ExRequest, Response as ExResponse } from 'express';
+import express, { NextFunction, Request, Response } from 'express';
+import expressWinston from 'express-winston';
 import swaggerUi from 'swagger-ui-express';
 import { ValidateError } from 'tsoa';
+import winston from 'winston';
 
 import { RegisterRoutes } from './generated/routes';
 import { setupIocContainer } from './ioc/config';
@@ -10,27 +11,33 @@ setupIocContainer();
 
 export const app = express();
 
-// Use body parser to read sent json payloads
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
+
 app.use(
-  bodyParser.urlencoded({
-    extended: true,
+  expressWinston.logger({
+    transports: [new winston.transports.Console()],
+    format: winston.format.combine(winston.format.colorize(), winston.format.json()),
+    meta: true,
+    msg: 'HTTP {{req.method}} {{req.url}}',
+    expressFormat: true,
+    colorize: true,
   })
 );
-app.use(bodyParser.json());
 
-app.use('/docs', swaggerUi.serve, async (_req: ExRequest, res: ExResponse) => {
+app.use('/docs', swaggerUi.serve, async (_req: Request, res: Response) => {
   return res.send(swaggerUi.generateHTML(await import('./generated/swagger.json')));
 });
 
 RegisterRoutes(app);
 
-app.use((_req, res: ExResponse) => {
+app.use((_req, res: Response) => {
   res.status(404).send({
     message: 'Not Found',
   });
 });
 
-app.use((err: unknown, req: ExRequest, res: ExResponse, next: NextFunction): ExResponse | void => {
+app.use((err: unknown, req: Request, res: Response, next: NextFunction): Response | void => {
   if (err instanceof ValidateError) {
     return res.status(422).json({
       message: 'Validation Failed',
