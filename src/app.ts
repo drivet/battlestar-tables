@@ -17,7 +17,7 @@ app.use(express.json());
 app.use(
   expressWinston.logger({
     transports: [new winston.transports.Console()],
-    format: winston.format.combine(winston.format.colorize(), winston.format.json()),
+    format: winston.format.combine(winston.format.colorize(), winston.format.prettyPrint()),
     meta: true,
     msg: 'HTTP {{req.method}} {{req.url}}',
     expressFormat: true,
@@ -39,6 +39,7 @@ app.use((_req, res: Response) => {
 
 app.use((err: unknown, req: Request, res: Response, next: NextFunction): Response | void => {
   if (err instanceof ValidateError) {
+    console.log(`ddddd ${JSON.stringify(err)}`);
     return res.status(422).json({
       message: 'Validation Failed',
       details: err?.fields,
@@ -47,3 +48,10 @@ app.use((err: unknown, req: Request, res: Response, next: NextFunction): Respons
     next(err);
   }
 });
+
+app.use(
+  expressWinston.errorLogger({
+    transports: [new winston.transports.Console()],
+    format: winston.format.combine(winston.format.colorize(), winston.format.json()),
+  })
+);
