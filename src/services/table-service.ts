@@ -5,7 +5,13 @@ import { v4 as uuidv4 } from 'uuid';
 import { Invite, InviteUpdatePayload, Table, TableCreatePayload } from './table-models';
 
 const uri =
-  'mongodb+srv://dbaccess:password@cluster0.7mduw.mongodb.net/battlestardb?retryWrites=true&w=majority';
+  'mongodb+srv://dbaccess:wsabtelbatchea@cluster0.7mduw.mongodb.net/battlestardb?retryWrites=true&w=majority';
+
+type NullableString = string | undefined;
+
+function getTableOwnerFilter(id: string, uid: NullableString) {
+  return uid ? { _id: id, inviter: uid } : { _id: id };
+}
 
 @injectable()
 export class TableService {
@@ -28,67 +34,67 @@ export class TableService {
     return newTable;
   }
 
-  async getTable(id: string): Promise<Table> {
+  async getTable(id: string, uid: NullableString): Promise<Table> {
     await this.client.connect();
-    return await this.getCollection().findOne({ _id: id });
+    return await this.getCollection().findOne(getTableOwnerFilter(id, uid));
   }
 
-  async getTables(inviter: string | undefined, invitee: string | undefined): Promise<Table[]> {
+  async getTables(uid: NullableString = undefined): Promise<Table[]> {
     await this.client.connect();
-    if (inviter && invitee) {
-      throw new Error('Cannot define both inviter and invitee');
-    }
-    if (inviter) {
-      return await this.getCollection().find({ inviter }).toArray();
-    } else if (invitee) {
-      return await this.getCollection().find({ 'invitations.invitee': invitee }).toArray();
-    } else {
+    if (!uid) {
       return await this.getCollection().find().toArray();
+    } else {
+      const owned = await this.getCollection().find({ inviter: uid }).toArray();
+      const invited = await this.getCollection().find({ 'invitations.invitee': uid }).toArray();
+      return [...owned, ...invited];
     }
   }
 
-  async deleteTable(id: string): Promise<void> {
+  async deleteTable(id: string, uid: NullableString): Promise<void> {
     await this.client.connect();
-    await this.getCollection().deleteOne({ _id: id });
+    await this.getCollection().deleteOne(getTableOwnerFilter(id, uid));
   }
 
-  async createInvite(id: string, invitee: string): Promise<void> {
+  async createInvite(id: string, invitee: string, uid: NullableString): Promise<void> {
     await this.client.connect();
+
     const newInvite: Invite = {
       invitee: invitee,
       createdAt: new Date(),
       status: 'created',
     };
-    await this.getCollection().updateOne(
-      { _id: id },
-      {
-        $pull: { invitations: { invitee } },
-      }
-    );
 
-    await this.getCollection().updateOne(
-      { _id: id },
-      {
-        $addToSet: {
-          invitations: newInvite,
-        },
-      }
-    );
+    // remove any existing invitation to that recipient
+    await this.getCollection().updateOne(getTableOwnerFilter(id, uid), {
+      $pull: { invitations: { invitee } },
+    });
+
+    // add the new inviation
+    await this.getCollection().updateOne(getTableOwnerFilter(id, uid), {
+      $addToSet: {
+        invitations: newInvite,
+      },
+    });
   }
 
-  async deleteInvite(id: string, invitee: string): Promise<void> {
+  async deleteInvite(id: string, invitee: string, uid: NullableString): Promise<void> {
     await this.client.connect();
-    await this.getCollection().updateOne(
-      { _id: id },
-      {
-        $pull: {
-          invitations: { invitee },
-        },
-      }
-    );
+    await this.getCollection().updateOne(getTableOwnerFilter(id, uid), {
+      $pull: {
+        invitations: { invitee },
+      },
+    });
   }
 
-  async updateInvite(id: string, invitee: string, payload: InviteUpdatePayload): Promise<void> {
+  async updateInvite(
+    id: string,
+    invitee: string,
+    payload: InviteUpdatePayload,
+    uid: NullableString
+  ): Promise<void> {
+    if (uid && uid !== invitee) {
+      throw new Error('Cannot update invite for which you are not the recipient');
+    }
     await this.client.connect();
     await this.getCollection().updateOne(
       { _id: id, 'invitations.invitee': invitee },
@@ -101,6 +107,6 @@ export class TableService {
   }
 
   private getCollection() {
-    return this.client.db('battlestardb').collection('groups');
+    return this.client.db('battlestardb').collection('tables');
   }
 }

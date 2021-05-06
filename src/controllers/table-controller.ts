@@ -4,11 +4,11 @@ import {
   Controller,
   Delete,
   Get,
+  Header,
   Patch,
   Path,
   Post,
   Put,
-  Query,
   Response,
   Route,
   Security,
@@ -54,8 +54,8 @@ export class TableController extends Controller {
   @Response(404, 'Not Found')
   @SuccessResponse('200', 'Ok')
   @Get('{id}')
-  public async getTable(@Path() id: string): Promise<Table> {
-    const table = await this.tableService.getTable(id);
+  public async getTable(@Path() id: string, @Header('x-uid') uid?: string): Promise<Table> {
+    const table = await this.tableService.getTable(id, uid);
     if (!table || !table._id) {
       throw {
         message: 'table not found',
@@ -67,13 +67,11 @@ export class TableController extends Controller {
 
   /**
    * Fetches a list of tables
-   * @param inviter the user who sent out the invites
-   * @param invitee the user who got the invite
    */
   @SuccessResponse('200', 'Ok')
   @Get()
-  public async getTables(@Query() inviter?: string, @Query() invitee?: string): Promise<Table[]> {
-    return await this.tableService.getTables(inviter, invitee);
+  public async getTables(@Header('x-uid') uid?: string): Promise<Table[]> {
+    return await this.tableService.getTables(uid);
   }
 
   /**
@@ -83,8 +81,8 @@ export class TableController extends Controller {
    */
   @SuccessResponse('204', 'No content')
   @Delete('{id}')
-  public async deleteTable(@Path() id: string): Promise<void> {
-    await this.tableService.deleteTable(id);
+  public async deleteTable(@Path() id: string, @Header('x-uid') uid?: string): Promise<void> {
+    await this.tableService.deleteTable(id, uid);
   }
 
   /**
@@ -95,8 +93,12 @@ export class TableController extends Controller {
    */
   @SuccessResponse('204', 'No content')
   @Put('{id}/invitations/{invitee}')
-  async createInvite(@Path() id: string, @Path() invitee: string): Promise<void> {
-    return this.tableService.createInvite(id, invitee);
+  async createInvite(
+    @Path() id: string,
+    @Path() invitee: string,
+    @Header('x-uid') uid: string
+  ): Promise<void> {
+    return this.tableService.createInvite(id, invitee, uid);
   }
 
   /**
@@ -112,9 +114,10 @@ export class TableController extends Controller {
   async updateInvite(
     @Path() id: string,
     @Path() invitee: string,
-    @Body() requestBody: InviteUpdatePayload
+    @Body() requestBody: InviteUpdatePayload,
+    @Header('x-uid') uid: string
   ): Promise<void> {
-    this.tableService.updateInvite(id, invitee, requestBody);
+    this.tableService.updateInvite(id, invitee, requestBody, uid);
   }
 
   /**
@@ -125,7 +128,11 @@ export class TableController extends Controller {
    */
   @SuccessResponse('204', 'No content')
   @Delete('{id}/invitations/{invitee}')
-  async deleteInvite(@Path() id: string, @Path() invitee: string): Promise<void> {
-    return this.tableService.deleteInvite(id, invitee);
+  async deleteInvite(
+    @Path() id: string,
+    @Path() invitee: string,
+    @Header('x-uid') uid: string
+  ): Promise<void> {
+    return this.tableService.deleteInvite(id, invitee, uid);
   }
 }
