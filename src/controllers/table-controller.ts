@@ -17,6 +17,7 @@ import {
 } from 'tsoa';
 
 import { InviteUpdatePayload, Table, TableCreatePayload } from '../services/table-models';
+import { InviteCreatePayload } from './../services/table-models';
 import { TableService } from './../services/table-service';
 
 interface ValidateErrorJSON {
@@ -50,6 +51,7 @@ export class TableController extends Controller {
    * Fetches an existing table
    *
    * @param id the table id of the table you want to fetch
+   * @param uid the owner of the table
    */
   @Response(404, 'Not Found')
   @SuccessResponse('200', 'Ok')
@@ -67,6 +69,8 @@ export class TableController extends Controller {
 
   /**
    * Fetches a list of tables
+   *
+   * @param uid the owner of the table
    */
   @SuccessResponse('200', 'Ok')
   @Get()
@@ -78,6 +82,7 @@ export class TableController extends Controller {
    * Deletes a table.  Not an error if the table does not exist
    *
    * @param id the table id of the table you want to delete
+   * @param uid the owner of the table
    */
   @SuccessResponse('204', 'No content')
   @Delete('{id}')
@@ -90,15 +95,19 @@ export class TableController extends Controller {
    *
    * @param id the table id of the table you want to invite people to
    * @param invitee the person sending the invitations
+   * @param uid the owner of the table
+   * @param payload extra info to create the invite
+   *
    */
   @SuccessResponse('204', 'No content')
   @Put('{id}/invitations/{invitee}')
   async createInvite(
     @Path() id: string,
     @Path() invitee: string,
+    @Body() payload: InviteCreatePayload,
     @Header('x-uid') uid: string
   ): Promise<void> {
-    return this.tableService.createInvite(id, invitee, uid);
+    return this.tableService.createInvite(id, invitee, uid, payload);
   }
 
   /**
@@ -107,6 +116,7 @@ export class TableController extends Controller {
    * @param id the table id of the table you want to invite people to
    * @param invitee the person sending the invitations
    * @param requestBody information to update the invite
+   * @param uid the owner of the table
    */
   @Response<ValidateErrorJSON>(422, 'Validation Failed')
   @SuccessResponse('204', 'No content')
@@ -125,6 +135,7 @@ export class TableController extends Controller {
    *
    * @param id the table id of the table you want to delete the invite from
    * @param invitee the recipient of the invitation you want to delete
+   * @param uid the owner of the table
    */
   @SuccessResponse('204', 'No content')
   @Delete('{id}/invitations/{invitee}')

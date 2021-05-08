@@ -2,7 +2,13 @@ import { injectable } from 'inversify';
 import { MongoClient } from 'mongodb';
 import { v4 as uuidv4 } from 'uuid';
 
-import { Invite, InviteUpdatePayload, Table, TableCreatePayload } from './table-models';
+import {
+  Invite,
+  InviteCreatePayload,
+  InviteUpdatePayload,
+  Table,
+  TableCreatePayload,
+} from './table-models';
 
 const uri =
   'mongodb+srv://dbaccess:wsabtelbatchea@cluster0.7mduw.mongodb.net/battlestardb?retryWrites=true&w=majority';
@@ -10,7 +16,7 @@ const uri =
 type NullableString = string | undefined;
 
 function getTableOwnerFilter(id: string, uid: NullableString) {
-  return uid ? { _id: id, inviter: uid } : { _id: id };
+  return uid ? { _id: id, ownerUid: uid } : { _id: id };
 }
 
 @injectable()
@@ -22,68 +28,101 @@ export class TableService {
   }
 
   async createTable(payload: TableCreatePayload): Promise<Table> {
-    await this.client.connect();
-    const newTable: Table = {
-      _id: uuidv4(),
-      inviter: payload.inviter,
-      bots: payload.bots,
-      seats: payload.seats,
-      createdAt: new Date(),
-    };
-    await this.getCollection().insertOne(newTable);
-    return newTable;
-  }
-
-  async getTable(id: string, uid: NullableString): Promise<Table> {
-    await this.client.connect();
-    return await this.getCollection().findOne(getTableOwnerFilter(id, uid));
-  }
-
-  async getTables(uid: NullableString = undefined): Promise<Table[]> {
-    await this.client.connect();
-    if (!uid) {
-      return await this.getCollection().find().toArray();
-    } else {
-      const owned = await this.getCollection().find({ inviter: uid }).toArray();
-      const invited = await this.getCollection().find({ 'invitations.invitee': uid }).toArray();
-      return [...owned, ...invited];
+    try {
+      await this.client.connect();
+      const newTable: Table = {
+        _id: uuidv4(),
+        owner: payload.owner,
+        ownerUid: payload.ownerUid,
+        bots: payload.bots,
+        seats: payload.seats,
+        createdAt: new Date(),
+      };
+      await this.getCollection().insertOne(newTable);
+      return newTable;
+    } finally {
+      //await this.client.close();
     }
   }
 
-  async deleteTable(id: string, uid: NullableString): Promise<void> {
-    await this.client.connect();
-    await this.getCollection().deleteOne(getTableOwnerFilter(id, uid));
+  async getTable(id: string, ownerUid: NullableString): Promise<Table> {
+    try {
+      await this.client.connect();
+      return await this.getCollection().findOne(getTableOwnerFilter(id, ownerUid));
+    } finally {
+      //await this.client.close();
+    }
   }
 
-  async createInvite(id: string, invitee: string, uid: NullableString): Promise<void> {
-    await this.client.connect();
+  async getTables(ownerUid: NullableString = undefined): Promise<Table[]> {
+    try {
+      await this.client.connect();
+      if (!ownerUid) {
+        return await this.getCollection().find().toArray();
+      } else {
+        const owned = await this.getCollection().find({ inviter: ownerUid }).toArray();
+        const invited = await this.getCollection()
+          .find({ 'invitations.invitee': ownerUid })
+          .toArray();
+        return [...owned, ...invited];
+      }
+    } finally {
+      //await this.client.close();
+    }
+  }
 
-    const newInvite: Invite = {
-      invitee: invitee,
-      createdAt: new Date(),
-      status: 'created',
-    };
+  async deleteTable(id: string, ownerUid: NullableString): Promise<void> {
+    try {
+      await this.client.connect();
+      await this.getCollection().deleteOne(getTableOwnerFilter(id, ownerUid));
+    } finally {
+      //await this.client.close();
+    }
+  }
 
-    // remove any existing invitation to that recipient
-    await this.getCollection().updateOne(getTableOwnerFilter(id, uid), {
-      $pull: { invitations: { invitee } },
-    });
+  async createInvite(
+    id: string,
+    invitee: string,
+    ownerUid: NullableString,
+    payload: InviteCreatePayload
+  ): Promise<void> {
+    try {
+      await this.client.connect();
 
-    // add the new inviation
-    await this.getCollection().updateOne(getTableOwnerFilter(id, uid), {
-      $addToSet: {
-        invitations: newInvite,
-      },
-    });
+      const newInvite: Invite = {
+        invitee: invitee,
+        inviteeUid: payload.inviteeUid,
+        createdAt: new Date(),
+        status: 'created',
+      };
+
+      // remove any existing invitation to that recipient
+      await this.getCollection().updateOne(getTableOwnerFilter(id, ownerUid), {
+        $pull: { invitations: { invitee } },
+      });
+
+      // add the new inviation
+      await this.getCollection().updateOne(getTableOwnerFilter(id, ownerUid), {
+        $addToSet: {
+          invitations: newInvite,
+        },
+      });
+    } finally {
+      //await this.client.close();
+    }
   }
 
   async deleteInvite(id: string, invitee: string, uid: NullableString): Promise<void> {
-    await this.client.connect();
-    await this.getCollection().updateOne(getTableOwnerFilter(id, uid), {
-      $pull: {
-        invitations: { invitee },
-      },
-    });
+    try {
+      await this.client.connect();
+      await this.getCollection().updateOne(getTableOwnerFilter(id, uid), {
+        $pull: {
+          invitations: { invitee },
+        },
+      });
+    } finally {
+      //await this.client.close();
+    }
   }
 
   async updateInvite(
@@ -95,15 +134,19 @@ export class TableService {
     if (uid && uid !== invitee) {
       throw new Error('Cannot update invite for which you are not the recipient');
     }
-    await this.client.connect();
-    await this.getCollection().updateOne(
-      { _id: id, 'invitations.invitee': invitee },
-      {
-        $set: {
-          'invitations.$.status': payload.status,
-        },
-      }
-    );
+    try {
+      await this.client.connect();
+      await this.getCollection().updateOne(
+        { _id: id, 'invitations.invitee': invitee },
+        {
+          $set: {
+            'invitations.$.status': payload.status,
+          },
+        }
+      );
+    } finally {
+      //await this.client.close();
+    }
   }
 
   private getCollection() {

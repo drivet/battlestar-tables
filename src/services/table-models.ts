@@ -4,33 +4,30 @@ export interface InviteUpdatePayload {
   status: InviteStatus;
 }
 
+export interface InviteCreatePayload {
+  inviteeUid: string;
+}
+
 export interface Invite {
   invitee: string;
+  inviteeUid: string;
   createdAt: Date;
   status: InviteStatus;
 }
 
 export interface TableCreatePayload {
-  inviter: string;
-
-  // 3-6
+  owner: string;
+  ownerUid: string;
   seats: number;
-
-  // 0 - (size -1)
   bots: number;
 }
 
 export interface Table {
   _id: string;
   createdAt: Date;
-
-  inviter: string;
-
-  // 3-6
+  owner: string;
+  ownerUid: string;
   seats: number;
-
-  // 0 - (size -1)
   bots: number;
-
   invitations?: Invite[];
 }
