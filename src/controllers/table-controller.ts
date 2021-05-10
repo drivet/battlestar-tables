@@ -51,13 +51,13 @@ export class TableController extends Controller {
    * Fetches an existing table
    *
    * @param id the table id of the table you want to fetch
-   * @param uid the owner of the table
+   * @param user the user making the call
    */
   @Response(404, 'Not Found')
   @SuccessResponse('200', 'Ok')
   @Get('{id}')
-  public async getTable(@Path() id: string, @Header('x-uid') uid?: string): Promise<Table> {
-    const table = await this.tableService.getTable(id, uid);
+  public async getTable(@Path() id: string, @Header('x-user') user?: string): Promise<Table> {
+    const table = await this.tableService.getTable(id, user);
     if (!table || !table._id) {
       throw {
         message: 'table not found',
@@ -70,80 +70,80 @@ export class TableController extends Controller {
   /**
    * Fetches a list of tables
    *
-   * @param uid the owner of the table
+   * @param user user making the call
    */
   @SuccessResponse('200', 'Ok')
   @Get()
-  public async getTables(@Header('x-uid') uid?: string): Promise<Table[]> {
-    return await this.tableService.getTables(uid);
+  public async getTables(@Header('x-user') user?: string): Promise<Table[]> {
+    return await this.tableService.getTables(user);
   }
 
   /**
    * Deletes a table.  Not an error if the table does not exist
    *
    * @param id the table id of the table you want to delete
-   * @param uid the owner of the table
+   * @param user user making the call
    */
   @SuccessResponse('204', 'No content')
   @Delete('{id}')
-  public async deleteTable(@Path() id: string, @Header('x-uid') uid?: string): Promise<void> {
-    await this.tableService.deleteTable(id, uid);
+  public async deleteTable(@Path() id: string, @Header('x-user') user?: string): Promise<void> {
+    await this.tableService.deleteTable(id, user);
   }
 
   /**
    * Creates an invitation
    *
    * @param id the table id of the table you want to invite people to
-   * @param invitee the person sending the invitations
-   * @param uid the owner of the table
-   * @param payload extra info to create the invite
+   * @param recipient the person sending the invitations
+   * @param payload information to create the invite
+   * @param user user making the call
    *
    */
   @SuccessResponse('204', 'No content')
-  @Put('{id}/invitations/{invitee}')
+  @Put('{id}/invitations/{recipient}')
   async createInvite(
     @Path() id: string,
-    @Path() invitee: string,
+    @Path() recipient: string,
     @Body() payload: InviteCreatePayload,
-    @Header('x-uid') uid: string
+    @Header('x-user') user?: string
   ): Promise<void> {
-    return this.tableService.createInvite(id, invitee, uid, payload);
+    return this.tableService.createInvite(id, recipient, payload, user);
   }
 
   /**
    * Updates an invitation
    *
-   * @param id the table id of the table you want to invite people to
-   * @param invitee the person sending the invitations
-   * @param requestBody information to update the invite
-   * @param uid the owner of the table
+   * @param id the table id of the table wioth the invite
+   * @param recipient the person receiving the invite
+   * @param payload information to update the invite
+   * @param user user making the call
    */
   @Response<ValidateErrorJSON>(422, 'Validation Failed')
   @SuccessResponse('204', 'No content')
-  @Patch('{id}/invitations/{invitee}')
+  @Patch('{id}/invitations/{recipient}')
   async updateInvite(
     @Path() id: string,
-    @Path() invitee: string,
-    @Body() requestBody: InviteUpdatePayload,
-    @Header('x-uid') uid: string
+    @Path() recipient: string,
+    @Body() payload: InviteUpdatePayload,
+    @Header('x-user') user?: string
   ): Promise<void> {
-    this.tableService.updateInvite(id, invitee, requestBody, uid);
+    this.tableService.updateInvite(id, recipient, payload, user);
   }
 
   /**
    * Deletes an invitation
    *
    * @param id the table id of the table you want to delete the invite from
-   * @param invitee the recipient of the invitation you want to delete
-   * @param uid the owner of the table
+   * @param recipient the recipient of the invitation you want to delete
+   * @param user user making the call
    */
   @SuccessResponse('204', 'No content')
-  @Delete('{id}/invitations/{invitee}')
+  @Delete('{id}/invitations/{recipient}')
   async deleteInvite(
     @Path() id: string,
-    @Path() invitee: string,
-    @Header('x-uid') uid: string
+    @Path() recipient: string,
+    @Header('x-user') user?: string
   ): Promise<void> {
-    return this.tableService.deleteInvite(id, invitee, uid);
+    return this.tableService.deleteInvite(id, recipient, user);
   }
 }

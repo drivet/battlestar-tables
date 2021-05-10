@@ -15,8 +15,8 @@ const uri =
 
 type NullableString = string | undefined;
 
-function getTableOwnerFilter(id: string, uid: NullableString) {
-  return uid ? { _id: id, ownerUid: uid } : { _id: id };
+function getTableOwnerFilter(id: string, user: NullableString) {
+  return user ? { _id: id, owner: user } : { _id: id };
 }
 
 @injectable()
@@ -33,7 +33,7 @@ export class TableService {
       const newTable: Table = {
         _id: uuidv4(),
         owner: payload.owner,
-        ownerUid: payload.ownerUid,
+        ownerUsername: payload.ownerUsername,
         bots: payload.bots,
         seats: payload.seats,
         createdAt: new Date(),
@@ -45,24 +45,24 @@ export class TableService {
     }
   }
 
-  async getTable(id: string, ownerUid: NullableString): Promise<Table> {
+  async getTable(id: string, user?: string): Promise<Table> {
     try {
       await this.client.connect();
-      return await this.getCollection().findOne(getTableOwnerFilter(id, ownerUid));
+      return await this.getCollection().findOne(getTableOwnerFilter(id, user));
     } finally {
       //await this.client.close();
     }
   }
 
-  async getTables(ownerUid: NullableString = undefined): Promise<Table[]> {
+  async getTables(user?: string): Promise<Table[]> {
     try {
       await this.client.connect();
-      if (!ownerUid) {
+      if (!user) {
         return await this.getCollection().find().toArray();
       } else {
-        const owned = await this.getCollection().find({ inviter: ownerUid }).toArray();
+        const owned = await this.getCollection().find({ inviter: user }).toArray();
         const invited = await this.getCollection()
-          .find({ 'invitations.invitee': ownerUid })
+          .find({ 'invitations.recipient': user })
           .toArray();
         return [...owned, ...invited];
       }
@@ -71,10 +71,10 @@ export class TableService {
     }
   }
 
-  async deleteTable(id: string, ownerUid: NullableString): Promise<void> {
+  async deleteTable(id: string, user?: string): Promise<void> {
     try {
       await this.client.connect();
-      await this.getCollection().deleteOne(getTableOwnerFilter(id, ownerUid));
+      await this.getCollection().deleteOne(getTableOwnerFilter(id, user));
     } finally {
       //await this.client.close();
     }
@@ -82,27 +82,27 @@ export class TableService {
 
   async createInvite(
     id: string,
-    invitee: string,
-    ownerUid: NullableString,
-    payload: InviteCreatePayload
+    recipient: string,
+    payload: InviteCreatePayload,
+    user?: string
   ): Promise<void> {
     try {
       await this.client.connect();
 
       const newInvite: Invite = {
-        invitee: invitee,
-        inviteeUid: payload.inviteeUid,
+        recipient: recipient,
+        recipientUsername: payload.recipientUsername,
         createdAt: new Date(),
         status: 'created',
       };
 
       // remove any existing invitation to that recipient
-      await this.getCollection().updateOne(getTableOwnerFilter(id, ownerUid), {
-        $pull: { invitations: { invitee } },
+      await this.getCollection().updateOne(getTableOwnerFilter(id, user), {
+        $pull: { invitations: { recipient } },
       });
 
       // add the new inviation
-      await this.getCollection().updateOne(getTableOwnerFilter(id, ownerUid), {
+      await this.getCollection().updateOne(getTableOwnerFilter(id, user), {
         $addToSet: {
           invitations: newInvite,
         },
@@ -112,12 +112,12 @@ export class TableService {
     }
   }
 
-  async deleteInvite(id: string, invitee: string, uid: NullableString): Promise<void> {
+  async deleteInvite(id: string, recipient: string, user?: string): Promise<void> {
     try {
       await this.client.connect();
-      await this.getCollection().updateOne(getTableOwnerFilter(id, uid), {
+      await this.getCollection().updateOne(getTableOwnerFilter(id, user), {
         $pull: {
-          invitations: { invitee },
+          invitations: { recipient },
         },
       });
     } finally {
@@ -127,17 +127,17 @@ export class TableService {
 
   async updateInvite(
     id: string,
-    invitee: string,
+    recipient: string,
     payload: InviteUpdatePayload,
-    uid: NullableString
+    user?: string
   ): Promise<void> {
-    if (uid && uid !== invitee) {
+    if (user && user !== recipient) {
       throw new Error('Cannot update invite for which you are not the recipient');
     }
     try {
       await this.client.connect();
       await this.getCollection().updateOne(
-        { _id: id, 'invitations.invitee': invitee },
+        { _id: id, 'invitations.recipient': recipient },
         {
           $set: {
             'invitations.$.status': payload.status,
