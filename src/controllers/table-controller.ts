@@ -42,9 +42,12 @@ export class TableController extends Controller {
   @Response<ValidateErrorJSON>(422, 'Validation Failed')
   @SuccessResponse('201', 'Created')
   @Post()
-  async createTable(@Body() requestBody: TableCreatePayload): Promise<Table> {
+  async createTable(
+    @Body() requestBody: TableCreatePayload,
+    @Header('x-user') user?: string
+  ): Promise<Table> {
     this.setStatus(201);
-    return this.tableService.createTable(requestBody);
+    return this.tableService.createTable(requestBody, user);
   }
 
   /**
