@@ -2,6 +2,7 @@ import { injectable } from 'inversify';
 import { MongoClient } from 'mongodb';
 import { v4 as uuidv4 } from 'uuid';
 
+import { getLogger } from '../system/logging';
 import {
   Invite,
   InviteCreatePayload,
@@ -16,6 +17,8 @@ const uri =
 function getOwnerFilter(id: string, user?: string) {
   return user ? { _id: id, owner: user } : { _id: id };
 }
+
+const logger = getLogger('TableService');
 
 @injectable()
 export class TableService {
@@ -55,6 +58,7 @@ export class TableService {
     if (!user) {
       return await this.getCollection().find().toArray();
     } else {
+      logger.debug(`Fetching tables for ${user}`);
       const owned = await this.getCollection().find({ owner: user }).toArray();
       const invited = await this.getCollection().find({ 'invitations.recipient': user }).toArray();
       return [...owned, ...invited];
