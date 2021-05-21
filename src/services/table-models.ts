@@ -31,3 +31,8 @@ export interface Table {
   bots: number;
   invitations?: Invite[];
 }
+
+export interface StampedTables {
+  date: number;
+  tables: Table[];
+}

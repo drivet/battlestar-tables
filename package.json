@@ -46,7 +46,7 @@
     "express": "^4.17.1",
     "express-winston": "^4.1.0",
     "inversify": "^5.0.5",
-    "mongodb": "^3.6.4",
+    "mongodb": "^3.6.7",
     "reflect-metadata": "^0.1.13",
     "swagger-ui-express": "^4.1.6",
     "tsoa": "^3.5.2",

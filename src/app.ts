@@ -5,6 +5,7 @@ import { ValidateError } from 'tsoa';
 import { RegisterRoutes } from './generated/routes';
 import { setupIocContainer } from './ioc/config';
 import { getHttpErrorLogger, getHttpLogger, getLogger } from './system/logging';
+import { router as tableStreamRouter } from './table-stream-router';
 
 const logger = getLogger();
 
@@ -20,6 +21,8 @@ app.use(getHttpLogger());
 app.use('/docs', swaggerUi.serve, async (_req: Request, res: Response) => {
   return res.send(swaggerUi.generateHTML(await import('./generated/swagger.json')));
 });
+
+app.use('/', tableStreamRouter);
 
 RegisterRoutes(app);
 

@@ -17,7 +17,7 @@ import {
 } from 'tsoa';
 
 import { InviteUpdatePayload, Table, TableCreatePayload } from '../services/table-models';
-import { InviteCreatePayload } from './../services/table-models';
+import { InviteCreatePayload, StampedTables } from './../services/table-models';
 import { TableService } from './../services/table-service';
 
 interface ValidateErrorJSON {
@@ -79,6 +79,17 @@ export class TableController extends Controller {
   @Get()
   public async getTables(@Header('x-user') user?: string): Promise<Table[]> {
     return await this.tableService.getTables(user);
+  }
+
+  /**
+   * Fetches a list of stamped tables
+   *
+   * @param user user making the call
+   */
+  @SuccessResponse('200', 'Ok')
+  @Get('{id}/stamped')
+  public async getStampedTables(@Header('x-user') user?: string): Promise<StampedTables> {
+    return await this.tableService.getStampedTables(user);
   }
 
   /**

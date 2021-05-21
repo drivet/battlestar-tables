@@ -1,33 +1,26 @@
-import { injectable } from 'inversify';
+import { inject, injectable } from 'inversify';
 import { MongoClient } from 'mongodb';
 import { v4 as uuidv4 } from 'uuid';
 
+import * as Symbols from '../ioc/symbols';
 import { getLogger } from '../system/logging';
 import {
   Invite,
   InviteCreatePayload,
   InviteUpdatePayload,
+  StampedTables,
   Table,
   TableCreatePayload,
 } from './table-models';
-
-const uri =
-  'mongodb+srv://dbaccess:wsabtelbatchea@cluster0.7mduw.mongodb.net/battlestardb?retryWrites=true&w=majority';
-
-function getOwnerFilter(id: string, user?: string) {
-  return user ? { _id: id, owner: user } : { _id: id };
-}
+import { getOwnerFilter, userTableFilter } from './table-utils';
 
 const logger = getLogger('TableService');
 
 @injectable()
 export class TableService {
   private connected = false;
-  private readonly client: MongoClient;
 
-  constructor() {
-    this.client = new MongoClient(uri);
-  }
+  constructor(@inject(Symbols.MongoClient) private readonly client: MongoClient) {}
 
   async createTable(payload: TableCreatePayload, user?: string): Promise<Table> {
     if (payload.owner !== user) {
@@ -59,10 +52,15 @@ export class TableService {
       return await this.getCollection().find().toArray();
     } else {
       logger.debug(`Fetching tables for ${user}`);
-      const owned = await this.getCollection().find({ owner: user }).toArray();
-      const invited = await this.getCollection().find({ 'invitations.recipient': user }).toArray();
-      return [...owned, ...invited];
+      return await this.getCollection().find(userTableFilter(user)).toArray();
     }
+  }
+
+  async getStampedTables(user?: string): Promise<StampedTables> {
+    await this.connect();
+    const date = Date.now();
+    const tables = await this.getTables(user);
+    return { date, tables };
   }
 
   async deleteTable(id: string, user?: string): Promise<void> {
