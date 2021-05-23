@@ -8,7 +8,6 @@ import {
   Invite,
   InviteCreatePayload,
   InviteUpdatePayload,
-  StampedTables,
   Table,
   TableCreatePayload,
 } from './table-models';
@@ -54,13 +53,6 @@ export class TableService {
       logger.debug(`Fetching tables for ${user}`);
       return await this.getCollection().find(userTableFilter(user)).toArray();
     }
-  }
-
-  async getStampedTables(user?: string): Promise<StampedTables> {
-    await this.connect();
-    const date = Date.now();
-    const tables = await this.getTables(user);
-    return { date, tables };
   }
 
   async deleteTable(id: string, user?: string): Promise<void> {
