@@ -2,11 +2,28 @@ import express, { Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 
 import { iocContainer } from './ioc/config';
-import { userTableMatchPipeline } from './services/table-utils';
 import { expressAuthentication } from './system/authentication';
+import { getLogger } from './system/logging';
 import { MongoChangeEmitter } from './system/mongo-emitter';
 
 export const router = express.Router();
+
+const logger = getLogger('Stream Router');
+
+// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
+function userStreamFilter(user: string) {
+  return {
+    $or: [
+      { 'fullDocument.owner': user },
+      { 'fullDocument.invitations.recipient': user },
+      { operationType: 'delete' },
+    ],
+  };
+}
+
+function userTableMatchPipeline(user?: string): Record<string, unknown>[] | undefined {
+  return user ? [{ $match: userStreamFilter(user) }] : undefined;
+}
 
 function handleStream<T>(req: Request, res: Response, emitter: MongoChangeEmitter) {
   res.writeHead(200, {
@@ -17,6 +34,7 @@ function handleStream<T>(req: Request, res: Response, emitter: MongoChangeEmitte
   });
 
   const listener = (data: T) => {
+    logger.debug(`Got new data to send`);
     const id = uuidv4();
     const dataStr = `${JSON.stringify(data)}`;
     res.write(`id: ${id}\n`);

@@ -1,9 +1,9 @@
 import { EventEmitter } from 'events';
-import { decorate, inject, injectable } from 'inversify';
-import { ChangeEvent, ChangeStream, ChangeStreamOptions, MongoClient, ObjectId } from 'mongodb';
+import { decorate, injectable } from 'inversify';
+import { ChangeEvent, ChangeStream, ChangeStreamOptions, ObjectId } from 'mongodb';
 
-import * as Symbols from '../ioc/symbols';
 import { getLogger } from './logging';
+import { MongoCollectionClient } from './mongo';
 import { FullChangeEvent } from './mongo-emitter-models';
 
 decorate(injectable(), EventEmitter);
@@ -13,15 +13,12 @@ const logger = getLogger('Emitter');
 @injectable()
 // eslint-disable-next-line @typescript-eslint/ban-types
 export class MongoChangeEmitter<T extends object = { _id: ObjectId }> extends EventEmitter {
-  private connected = false;
-
-  constructor(@inject(Symbols.MongoClient) private readonly client: MongoClient) {
+  constructor(private readonly client: MongoCollectionClient) {
     super();
   }
 
-  async start(pipeline?: Record<string, unknown>[]): Promise<void> {
+  start(pipeline?: Record<string, unknown>[]): void {
     logger.debug(`Starting stream...`);
-    this.connect();
     this.stream(pipeline);
   }
 
@@ -33,9 +30,9 @@ export class MongoChangeEmitter<T extends object = { _id: ObjectId }> extends Ev
     this.emitLoop(options, pipeline);
   }
 
-  private emitLoop(options: ChangeStreamOptions, pipeline?: Record<string, unknown>[]) {
-    const watchCursor = this.getCursor(options, pipeline);
-    watchCursor.on('change', async (next: ChangeEvent<T>) => {
+  private async emitLoop(options: ChangeStreamOptions, pipeline?: Record<string, unknown>[]) {
+    const watchCursor = await this.getCursor(options, pipeline);
+    watchCursor.on('change', (next: ChangeEvent<T>) => {
       const event = this.changeEvent(next);
       if (event) {
         this.emit('data', event);
@@ -44,6 +41,7 @@ export class MongoChangeEmitter<T extends object = { _id: ObjectId }> extends Ev
   }
 
   private changeEvent(changeEvent: ChangeEvent<T>): FullChangeEvent<T> | undefined {
+    logger.debug(`got change event ${JSON.stringify(changeEvent)}`);
     if (
       changeEvent.operationType === 'insert' ||
       changeEvent.operationType === 'replace' ||
@@ -67,29 +65,16 @@ export class MongoChangeEmitter<T extends object = { _id: ObjectId }> extends Ev
     }
   }
 
-  private getCursor(
+  private async getCursor(
     options: ChangeStreamOptions,
     pipeline?: Record<string, unknown>[]
-  ): ChangeStream<T> {
+  ): Promise<ChangeStream<T>> {
     return pipeline
-      ? this.getCollection().watch(pipeline, options)
-      : this.getCollection().watch(options);
+      ? (await this.getCollection()).watch(pipeline, options)
+      : (await this.getCollection()).watch(options);
   }
 
-  private getCollection() {
-    return this.client.db('battlestardb').collection('tables');
-  }
-
-  private async connect(): Promise<void> {
-    if (!this.connected) {
-      logger.debug(`Connecting...`);
-      try {
-        await this.client.connect();
-      } catch (err) {
-        logger.error(`got error connecting to mongo: ${err}`);
-      }
-      logger.debug(`Connected...`);
-      this.connected = true;
-    }
+  private async getCollection() {
+    return await this.client.getCollection('battlestardb', 'tables');
   }
 }

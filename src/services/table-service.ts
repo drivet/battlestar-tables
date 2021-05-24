@@ -1,9 +1,8 @@
-import { inject, injectable } from 'inversify';
-import { MongoClient } from 'mongodb';
+import { injectable } from 'inversify';
 import { v4 as uuidv4 } from 'uuid';
 
-import * as Symbols from '../ioc/symbols';
 import { getLogger } from '../system/logging';
+import { MongoCollectionClient } from '../system/mongo';
 import {
   Invite,
   InviteCreatePayload,
@@ -17,9 +16,7 @@ const logger = getLogger('TableService');
 
 @injectable()
 export class TableService {
-  private connected = false;
-
-  constructor(@inject(Symbols.MongoClient) private readonly client: MongoClient) {}
+  constructor(private readonly client: MongoCollectionClient) {}
 
   async createTable(payload: TableCreatePayload, user?: string): Promise<Table> {
     if (payload.owner !== user) {
@@ -27,7 +24,6 @@ export class TableService {
         `Tables can only be created for oneself, requested owner: ${payload.owner}, header: ${user}`
       );
     }
-    await this.connect();
     const newTable: Table = {
       _id: uuidv4(),
       owner: payload.owner,
@@ -36,28 +32,25 @@ export class TableService {
       seats: payload.seats,
       createdAt: new Date(),
     };
-    await this.getCollection().insertOne(newTable);
+    (await this.getCollection()).insertOne(newTable);
     return newTable;
   }
 
   async getTable(id: string, user?: string): Promise<Table> {
-    await this.connect();
-    return await this.getCollection().findOne(getOwnerFilter(id, user));
+    return (await this.getCollection()).findOne(getOwnerFilter(id, user));
   }
 
   async getTables(user?: string): Promise<Table[]> {
-    await this.connect();
     if (!user) {
-      return await this.getCollection().find().toArray();
+      return (await this.getCollection()).find().toArray();
     } else {
       logger.debug(`Fetching tables for ${user}`);
-      return await this.getCollection().find(userTableFilter(user)).toArray();
+      return (await this.getCollection()).find(userTableFilter(user)).toArray();
     }
   }
 
   async deleteTable(id: string, user?: string): Promise<void> {
-    await this.connect();
-    await this.getCollection().deleteOne(getOwnerFilter(id, user));
+    (await this.getCollection()).deleteOne(getOwnerFilter(id, user));
   }
 
   async createInvite(
@@ -66,8 +59,6 @@ export class TableService {
     payload: InviteCreatePayload,
     user?: string
   ): Promise<void> {
-    await this.connect();
-
     const newInvite: Invite = {
       recipient: recipient,
       recipientUsername: payload.recipientUsername,
@@ -76,12 +67,12 @@ export class TableService {
     };
 
     // remove any existing invitation to that recipient
-    await this.getCollection().updateOne(getOwnerFilter(id, user), {
+    (await this.getCollection()).updateOne(getOwnerFilter(id, user), {
       $pull: { invitations: { recipient } },
     });
 
     // add the new inviation
-    await this.getCollection().updateOne(getOwnerFilter(id, user), {
+    (await this.getCollection()).updateOne(getOwnerFilter(id, user), {
       $addToSet: {
         invitations: newInvite,
       },
@@ -89,8 +80,7 @@ export class TableService {
   }
 
   async deleteInvite(id: string, recipient: string, user?: string): Promise<void> {
-    await this.connect();
-    await this.getCollection().updateOne(getOwnerFilter(id, user), {
+    (await this.getCollection()).updateOne(getOwnerFilter(id, user), {
       $pull: {
         invitations: { recipient },
       },
@@ -107,8 +97,7 @@ export class TableService {
       throw new Error('Cannot update invite for which you are not the recipient');
     }
 
-    await this.connect();
-    await this.getCollection().updateOne(
+    (await this.getCollection()).updateOne(
       { _id: id, 'invitations.recipient': recipient },
       {
         $set: {
@@ -118,14 +107,7 @@ export class TableService {
     );
   }
 
-  private getCollection() {
-    return this.client.db('battlestardb').collection('tables');
-  }
-
-  private async connect(): Promise<void> {
-    if (!this.connected) {
-      await this.client.connect();
-      this.connected = true;
-    }
+  private async getCollection() {
+    return await this.client.getCollection('battlestardb', 'tables');
   }
 }
